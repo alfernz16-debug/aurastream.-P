@@ -1,13 +1,18 @@
 {
   "name": "AuraStream - Media Player",
   "short_name": "AuraStream",
-  "description": "Modern music and video player with equalizer",
+  "description": "Modern music and video player with equalizer and offline support.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#10b981",
   "orientation": "portrait-primary",
+  "id": "/?aurastream",
+  "lang": "en",
+  "categories": ["music", "audio", "media", "entertainment"],
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "icons/icon-72.png",
