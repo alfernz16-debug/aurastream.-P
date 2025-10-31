@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraStream - Media Player</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AuraStream">
+    <meta name="description" content="Modern music and video player with 3-band equalizer">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #fff;
+            overflow-x: hidden;
+            touch-action: pan-y;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            padding: 1rem;
+            border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .page-nav {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            right: 0;
+            z-index: 99;
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            color: #10b981;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn.active {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .page-container {
+            margin-top: 140px;
+            min-height: calc(100vh - 140px);
+            padding-bottom: 120px;
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .upload-zone {
+            margin: 1rem;
+            padding: 3rem 1rem;
+            background: rgba(16, 185, 129, 0.05);
+            border: 2px dashed rgba(16, 185, 129, 0.3);
+            border-radius: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-zone:hover {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+
+        .upload-zone svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 1rem;
+            opacity: 0.6;
+        }
+
+        .playlist {
+            padding: 1rem;
+        }
+
+        .track-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            background: rgba(16, 185, 129, 0.05);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .track-item:hover {
+            background: rgba(16, 185, 129, 0.1);
+            transform: translateX(5px);
+        }
+
+        .track-item.playing {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .track-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .track-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .track-name {
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .track-duration {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .equalizer {
+            padding: 1.5rem;
+            margin: 1rem;
+            background: rgba(16, 185, 129, 0.05);
+            border-radius: 20px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .eq-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .eq-band {
+            margin-bottom: 1.5rem;
+        }
+
+        .eq-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .eq-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(16, 185, 129, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .eq-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .eq-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .now-playing {
+            position: fixed;
+            bottom: -100%;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 1.5rem;
+            z-index: 101;
+            transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .now-playing.active {
+            bottom: 0;
+        }
+
+        .np-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .np-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .np-artwork {
+            width: 100%;
+            max-width: 300px;
+            height: 300px;
+            margin: 0 auto 2rem;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+        }
+
+        .np-info {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .np-track-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-container {
+            margin-bottom: 1rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(16, 185, 129, 0.2);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 0.5rem;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .control-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: rgba(16, 185, 129, 0.3);
+            transform: scale(1.05);
+        }
+
+        .control-btn.play-btn {
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            color: #fff;
+            font-size: 2rem;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .video-container {
+            position: relative;
+            margin: 1rem;
+            border-radius: 20px;
+            overflow: hidden;
+            background: #000;
+            display: none;
+        }
+
+        .video-player {
+            width: 100%;
+            display: block;
+        }
+
+        .video-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+            padding: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .video-container:hover .video-controls,
+        .video-controls.show {
+            opacity: 1;
+        }
+
+        .video-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+        }
+
+        .video-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);
+            border-radius: 2px;
+            width: 0%;
+        }
+
+        .video-buttons {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .video-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            transition: transform 0.2s ease;
+        }
+
+        .video-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .video-time {
+            color: #fff;
+            font-size: 0.9rem;
+            margin-left: auto;
+        }
+
+        .video-list {
+            padding: 1rem;
+        }
+
+        .video-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            background: rgba(16, 185, 129, 0.05);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .video-item:hover {
+            background: rgba(16, 185, 129, 0.1);
+            transform: translateX(5px);
+        }
+
+        .video-item.playing {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .video-thumbnail {
+            width: 80px;
+            height: 60px;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1.5rem;
+        }
+
+        .settings {
+            padding: 1rem;
+        }
+
+        .setting-section {
+            background: rgba(16, 185, 129, 0.05);
+            border-radius: 20px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .setting-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 52px;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 24px;
+            height: 24px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(24px);
+        }
+
+        .visualizer {
+            height: 80px;
+            background: rgba(16, 185, 129, 0.05);
+            border-radius: 12px;
+            margin: 1rem;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 3px;
+            padding: 0.5rem;
+        }
+
+        .visualizer-bar {
+            width: 4px;
+            background: linear-gradient(to top, #10b981 0%, #06b6d4 100%);
+            border-radius: 2px;
+            transition: height 0.1s ease;
+        }
+
+        .install-banner {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            gap: 1rem;
+            animation: slideUp 0.3s ease;
+        }
+
+        .install-banner.show {
+            display: flex;
+        }
+
+        @keyframes slideUp {
+            from { transform: translate(-50%, 100px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        .install-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .install-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        @media (orientation: landscape) and (max-width: 1024px) {
+            .video-container.fullscreen {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                margin: 0;
+                border-radius: 0;
+                z-index: 200;
+            }
+
+            .video-container.fullscreen .video-player {
+                height: 100vh;
+                object-fit: contain;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎵 AuraStream</h1>
+    </div>
+
+    <div class="page-nav">
+        <button class="nav-btn active" data-page="music">Music</button>
+        <button class="nav-btn" data-page="video">Video</button>
+        <button class="nav-btn" data-page="settings">Settings</button>
+    </div>
+
+    <div class="page-container">
+        <div class="page active" id="music-page">
+            <div class="upload-zone" id="audio-upload">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                </svg>
+                <p style="margin-bottom: 0.5rem;">Tap to add music</p>
+                <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">MP3, WAV, OGG supported</p>
+                <input type="file" id="audio-input" accept="audio/*" multiple style="display: none;">
+            </div>
+
+            <div class="visualizer" id="visualizer"></div>
+
+            <div class="equalizer">
+                <div class="eq-title">3-Band Equalizer</div>
+                <div class="eq-band">
+                    <div class="eq-label">
+                        <span>Low (Bass)</span>
+                        <span id="low-value">0 dB</span>
+                    </div>
+                    <input type="range" class="eq-slider" id="low-slider" min="-12" max="12" value="0" step="1">
+                </div>
+                <div class="eq-band">
+                    <div class="eq-label">
+                        <span>Mid</span>
+                        <span id="mid-value">0 dB</span>
+                    </div>
+                    <input type="range" class="eq-slider" id="mid-slider" min="-12" max="12" value="0" step="1">
+                </div>
+                <div class="eq-band">
+                    <div class="eq-label">
+                        <span>High (Treble)</span>
+                        <span id="high-value">0 dB</span>
+                    </div>
+                    <input type="range" class="eq-slider" id="high-slider" min="-12" max="12" value="0" step="1">
+                </div>
+            </div>
+
+            <div class="playlist" id="playlist"></div>
+        </div>
+
+        <div class="page" id="video-page">
+            <div class="upload-zone" id="video-upload">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <p style="margin-bottom: 0.5rem;">Tap to add videos</p>
+                <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">MP4, WebM, OGG supported</p>
+                <input type="file" id="video-input" accept="video/*" multiple style="display: none;">
+            </div>
+
+            <div class="video-container" id="video-container">
+                <video class="video-player" id="video-player"></video>
+                <div class="video-controls" id="video-controls">
+                    <div class="video-progress" id="video-progress">
+                        <div class="video-progress-fill" id="video-progress-fill"></div>
+                    </div>
+                    <div class="video-buttons">
+                        <button class="video-btn" id="video-play-btn">▶</button>
+                        <button class="video-btn" id="video-fullscreen-btn">⛶</button>
+                        <span class="video-time" id="video-time">0:00 / 0:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="video-list" id="video-list"></div>
+        </div>
+
+        <div class="page" id="settings-page">
+            <div class="settings">
+                <div class="setting-section">
+                    <div class="setting-title">Audio Settings</div>
+                    <div class="setting-item">
+                        <span>Crossfade between tracks</span>
+                        <div class="toggle-switch" id="crossfade-toggle">
+                            <div class="toggle-slider"></div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <span>Audio visualizer</span>
+                        <div class="toggle-switch active" id="visualizer-toggle">
+                            <div class="toggle-slider"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-section">
+                    <div class="setting-title">Video Settings</div>
+                    <div class="setting-item">
+                        <span>Auto-rotate to fullscreen</span>
+                        <div class="toggle-switch active" id="autorotate-toggle">
+                            <div class="toggle-slider"></div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <span>Bass boost for videos</span>
+                        <div class="toggle-switch active" id="bass-boost-toggle">
+                            <div class="toggle-slider"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-section">
+                    <div class="setting-title">Playback Settings</div>
+                    <div class="setting-item">
+                        <span>Loop current track</span>
+                        <div class="toggle-switch" id="loop-toggle">
+                            <div class="toggle-slider"></div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <span>Shuffle playlist</span>
+                        <div class="toggle-switch" id="shuffle-toggle">
+                            <div class="toggle-slider"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-section">
+                    <div class="setting-title">About</div>
+                    <div class="setting-item">
+                        <span>Version</span>
+                        <span style="color: rgba(255,255,255,0.6);">1.0.0</span>
+                    </div>
+                    <div class="setting-item">
+                        <span>Total tracks</span>
+                        <span style="color: rgba(255,255,255,0.6);" id="total-tracks">0</span>
+                    </div>
+                    <div class="setting-item">
+                        <span>Total videos</span>
+                        <span style="color: rgba(255,255,255,0.6);" id="total-videos">0</span>
+                    </div>
+                    <div class="setting-item">
+                        <span>Install Status</span>
+                        <span style="color: rgba(255,255,255,0.6);" id="install-status">Not installed</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="now-playing" id="now-playing">
+        <div class="np-header">
+            <div class="np-title">Now Playing</div>
+            <button class="close-btn" id="close-np">×</button>
+        </div>
+        <div class="np-artwork" id="np-artwork">🎵</div>
+        <div class="np-info">
+            <div class="np-track-name" id="np-track-name">Select a track</div>
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar" id="audio-progress">
+                <div class="progress-fill" id="audio-progress-fill"></div>
+            </div>
+            <div class="time-display">
+                <span id="current-time">0:00</span>
+                <span id="total-time">0:00</span>
+            </div>
+        </div>
+        <div class="controls">
+            <button class="control-btn" id="prev-btn">⏮</button>
+            <button class="control-btn play-btn" id="play-btn">▶</button>
+            <button class="control-btn" id="next-btn">⏭</button>
+        </div>
+    </div>
+
+    <div class="install-banner" id="install-banner">
+        <span>📥 Install AuraStream for better experience</span>
+        <button class="install-btn" id="install-app-btn">Install</button>
+        <button class="install-btn" id="dismiss-install-btn">×</button>
+    </div>
+
+    <script>
+        let audioContext, audioSource, lowShelf, midPeak, highShelf, analyser;
+        let audioElement = new Audio();
+        let currentTrackIndex = -1;
+        let tracks = [];
+        let isPlaying = false;
+
+        let videoContext, videoSource, videoLowShelf;
+        let videos = [];
+        let currentVideoIndex = -1;
+
+        let settings = {
+            crossfade: false,
+            visualizer: true,
+            autoRotate: true,
+            bassBoost: true,
+            loop: false,
+            shuffle: false
+        };
+
+        let deferredPrompt;
+
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                lowShelf = audioContext.createBiquadFilter();
+                lowShelf.type = 'lowshelf';
+                lowShelf.frequency.value = 200;
+                lowShelf.gain.value = 0;
+
+                midPeak = audioContext.createBiquadFilter();
+                midPeak.type = 'peaking';
+                midPeak.frequency.
